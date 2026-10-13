@@ -1,0 +1,39 @@
+# Confidential project: ignore everything except explicitly approved source files.
+# New source files must be added to this list before Git will track them.
+*
+!/.gitignore
+!/EmailBlasting_Template.py
+!/requirements.txt
+!/README.md
+!/.streamlit/
+/.streamlit/*
+!/.streamlit/config.toml
+!/tests/
+/tests/*
+!/tests/test_email_blasting.py
+
+# Keep these private even if the approved file list is expanded later.
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.env
+.env.*
+**/secrets.toml
+*.pem
+*.key
+*.csv
+*.xlsx
+*.xls
+*.xlsm
+*.xlsb
+*.parquet
+*.db
+*.sqlite*
+data/
+uploads/
+reports/
+exports/
+private/
+.vscode/
+.idea/

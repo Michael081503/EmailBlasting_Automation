@@ -1,0 +1,14 @@
+# App access is configured in Streamlit Community Cloud, not in this file.
+[browser]
+gatherUsageStats = false
+
+[client]
+showErrorDetails = "none"
+toolbarMode = "viewer"
+
+[server]
+maxUploadSize = 10
+enableCORS = true
+enableXsrfProtection = true
+enableStaticServing = false
+disconnectedSessionTTL = 60

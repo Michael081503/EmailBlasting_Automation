@@ -13,7 +13,7 @@ from streamlit.testing.v1 import AppTest
 
 from EmailBlasting_Template import (
     OPTIONAL_COLUMNS, REQUIRED_COLUMNS, TEMPLATE_COLUMNS, ValidationError,
-    export_workbook, output_filename, populate_template, prepare_group_downloads,
+    automate_template, export_workbook, output_filename, populate_template, prepare_group_downloads,
     read_source, split_amnesty, suggest_mapping,
 )
 
@@ -154,6 +154,88 @@ class TemplateTests(unittest.TestCase):
             output_filename("North/West", r"C:\Reports\Source File.xlsx", exported_at),
             "EmailBlasting_(North_West)_Source_File_20261013_203045_123456.xlsx",
         )
+
+
+class TemplateAutomationTests(unittest.TestCase):
+    def test_headers_are_cleaned_and_renamed_without_changing_values(self):
+        source = read_source(SOURCE_CSV, "source.csv")
+        original = source.copy(deep=True)
+        output = automate_template(source)
+        self.assertEqual(output.columns.tolist(), [
+            "Email", "PrimaryKey", "IndexOneUID", "CardNumber", "FullName",
+            "PhoneNumber", "OutstandingBalance", "Monthly", "Terms", "DOClass",
+            "Level", "Product", "EndoDate",
+        ])
+        self.assertEqual(output.values.tolist(), source.values.tolist())
+        pd.testing.assert_frame_equal(source, original)
+
+    def test_missing_fields_are_added_independently_and_existing_fields_are_kept(self):
+        for fields in ({}, {"AGENT": ["100"]}, {"CODE": ["12"]},
+                       {"monthly": ["100"], "TERMS": ["12"]}):
+            with self.subTest(fields=fields):
+                output = automate_template(pd.DataFrame({"chname": ["Alex Example"], **fields}))
+                self.assertEqual(output["FullName"].tolist(), ["Alex Example"])
+                self.assertEqual(output["Monthly"].tolist(), ["100" if "AGENT" in fields or "monthly" in fields else ""])
+                self.assertEqual(output["Terms"].tolist(), ["12" if "CODE" in fields or "TERMS" in fields else ""])
+                self.assertEqual(len(output.columns), 3)
+
+    def test_header_whitespace_is_removed_but_cell_whitespace_is_preserved(self):
+        output = automate_template(pd.DataFrame({" C H\tName ": [" Alex Example "], " Phone\nNumber ": ["00123"]}))
+        self.assertEqual(output.columns.tolist(), ["FullName", "PhoneNumber", "Monthly", "Terms"])
+        self.assertEqual(output.iloc[0].tolist(), [" Alex Example ", "00123", "", ""])
+
+    def test_conflicting_headers_are_rejected(self):
+        for headers in (["Agent", "Monthly"], ["Code", "Terms"],
+                        ["chname", "FullName"], ["A B", "AB"]):
+            with self.subTest(headers=headers), self.assertRaisesRegex(ValidationError, "duplicate"):
+                automate_template(pd.DataFrame([["first", "second"]], columns=headers))
+
+    def test_new_page_upload_download_and_clear(self):
+        page = APP_PATH.parent / "pages" / "Template_Automation.py"
+        app = AppTest.from_file(str(page), default_timeout=20).run()
+        self.assertFalse(app.exception, [error.message for error in app.exception])
+        self.assertEqual(app.title[0].value, "Template Automation")
+        app.file_uploader[0].set_value(("source.csv", b"ch name,Phone Number\n=2+2,00123\n", "text/csv"))
+        app.run()
+        self.assertFalse(app.exception, [error.message for error in app.exception])
+        self.assertFalse(app.error)
+        self.assertEqual(app.dataframe[-1].value.columns.tolist(), ["FullName", "PhoneNumber", "Monthly", "Terms"])
+        self.assertEqual(len(app.get("download_button")), 1)
+        result = app.session_state["template_automation_result"]
+        self.assertTrue(result["filename"].startswith("TemplateAutomation_source_"))
+        workbook = load_workbook(io.BytesIO(result["content"]), data_only=False)
+        sheet = workbook.active
+        self.assertEqual([cell.value for cell in sheet[1]], ["FullName", "PhoneNumber", "Monthly", "Terms"])
+        self.assertEqual(sheet["A2"].value, "=2+2")
+        self.assertEqual(sheet["A2"].data_type, "s")
+        self.assertEqual(sheet["B2"].value, "00123")
+        self.assertIsNone(sheet["C2"].value)
+        self.assertIsNone(sheet["D2"].value)
+        workbook.close()
+        next(button for button in app.button if button.label == "Clear source file").click().run()
+        self.assertFalse(app.exception)
+        self.assertNotIn("template_automation_result", app.session_state)
+        self.assertFalse(app.get("download_button"))
+
+    def test_new_page_uses_selected_excel_sheet_and_header_row(self):
+        workbook = Workbook()
+        workbook.active.title = "Notes"
+        workbook.active.append(["Instructions"])
+        sheet = workbook.create_sheet("Data")
+        sheet.append(["Report"])
+        sheet.append(["CHNAME", "Agent", "Code"])
+        sheet.append(["Alex Example", "100", "12"])
+        buffer = io.BytesIO()
+        workbook.save(buffer)
+        workbook.close()
+        app = AppTest.from_file(str(APP_PATH.parent / "pages" / "Template_Automation.py"), default_timeout=20).run()
+        app.file_uploader[0].set_value(("source.xlsx", buffer.getvalue(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+        app.run()
+        app.selectbox[0].set_value("Data")
+        app.number_input[0].set_value(2).run()
+        self.assertFalse(app.exception, [error.message for error in app.exception])
+        self.assertFalse(app.error)
+        self.assertEqual(app.dataframe[-1].value.to_dict("records"), [{"FullName": "Alex Example", "Monthly": "100", "Terms": "12"}])
 
 
 class InterfaceTests(unittest.TestCase):

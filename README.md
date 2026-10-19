@@ -2,6 +2,8 @@
 
 `EmailBlasting_Template.py` copies values from an uploaded Excel or CSV file into the 15-column template.
 
+Choose **Template Automation** in the sidebar for the separate header-cleanup workflow. Upload an Excel or UTF-8 CSV file, select the sheet/header row if needed, preview the result, and download Excel. This page removes all whitespace from headers and renames `chname` → `FullName`, `Agent` → `Monthly`, and `Code` → `Terms`, ignoring capitalization. Missing `Monthly` and `Terms` columns are added with blank values; existing columns with those names are kept. Other columns and data values retain their order. Conflicting headers after cleanup are rejected so no columns are overwritten.
+
 Output columns:
 
 ```text
@@ -24,7 +26,7 @@ py -3.13 -m venv .venv
 .\.venv\Scripts\python.exe -m streamlit run EmailBlasting_Template.py --server.address=127.0.0.1
 ```
 
-For GitHub and Streamlit, include `EmailBlasting_Template.py`, `requirements.txt`, and `.streamlit/config.toml`. Set the main file path to `EmailBlasting_Template.py` and use Python 3.13. No credentials or separate template workbook are required. Keep source data out of GitHub and use the project's private sharing settings.
+For GitHub and Streamlit, include `EmailBlasting_Template.py`, `pages/Template_Automation.py`, `requirements.txt`, and `.streamlit/config.toml`. Set the main file path to `EmailBlasting_Template.py` and use Python 3.13. No credentials or separate template workbook are required. Keep source data out of GitHub and use the project's private sharing settings.
 
 To deploy on [Streamlit Community Cloud](https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/deploy):
 

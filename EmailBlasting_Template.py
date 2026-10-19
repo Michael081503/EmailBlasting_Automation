@@ -214,14 +214,35 @@ def split_amnesty(source, output, area_column, amnesty_column):
     return groups, int(areas.eq("").sum())
 
 
-def export_workbook(output):
-    """Export only template headers and values, without workbook styling."""
-    if output.columns.tolist() != TEMPLATE_COLUMNS:
-        raise ValidationError("The output must use the 15 template columns in their original order.")
+def automate_template(source):
+    """Clean headers and supply the Monthly and Terms fields without changing rows."""
+    renames = {"chname": "FullName", "agent": "Monthly", "code": "Terms",
+               "monthly": "Monthly", "terms": "Terms"}
+    headers = []
+    for column in source.columns:
+        cleaned = re.sub(r"\s+", "", str(column))
+        if not cleaned:
+            raise ValidationError("Every source column must have a header.")
+        headers.append(renames.get(cleaned.casefold(), cleaned))
+    if len({header.casefold() for header in headers}) != len(headers):
+        raise ValidationError(
+            "Header cleanup would create duplicate columns. Use distinct headers "
+            "and include only one of Agent/Monthly and Code/Terms."
+        )
+    output = source.copy()
+    output.columns = headers
+    for field in ("Monthly", "Terms"):
+        if field not in output.columns:
+            output[field] = ""
+    return output
+
+
+def export_table(output):
+    """Export table headers and text values, without workbook styling."""
     workbook = Workbook(write_only=True)
     workbook.properties.creator = ""
     sheet = workbook.create_sheet("Sheet1")
-    sheet.append(TEMPLATE_COLUMNS)
+    sheet.append(output.columns.tolist())
     for values in output.itertuples(index=False, name=None):
         cells = []
         for value in values:
@@ -233,6 +254,13 @@ def export_workbook(output):
     workbook.save(buffer)
     workbook.close()
     return buffer.getvalue()
+
+
+def export_workbook(output):
+    """Export only the 15 template columns in their original order."""
+    if output.columns.tolist() != TEMPLATE_COLUMNS:
+        raise ValidationError("The output must use the 15 template columns in their original order.")
+    return export_table(output)
 
 
 def output_filename(area, source_name, generated_at, category=None):

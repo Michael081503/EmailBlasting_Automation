@@ -3,6 +3,9 @@
 *
 !/.gitignore
 !/EmailBlasting_Template.py
+!/pages/
+/pages/*
+!/pages/Template_Automation.py
 !/requirements.txt
 !/README.md
 !/.streamlit/
